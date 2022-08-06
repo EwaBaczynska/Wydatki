@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
@@ -17,35 +18,72 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Flutter Demo',
-      theme: ThemeData(primarySwatch: Colors.red),
+      theme: ThemeData(primarySwatch: Colors.blue),
       home: HomePage(),
     );
   }
 }
 
 class HomePage extends StatelessWidget {
-  const HomePage({
+  HomePage({
     Key? key,
   }) : super(key: key);
+
+  final controller = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Wydatki'),
+        title: const Text('Do zrobienia'),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {},
+        onPressed: () {
+          FirebaseFirestore.instance.collection('categories').add(
+            {
+              'title': controller.text,
+            },
+          );
+          controller.clear();
+        },
         child: const Icon(Icons.add),
       ),
-      body: ListView(
-        children: const [
-          CategoryWidget("Kategoria 1"),
-          CategoryWidget("Kategoria 2"),
-          CategoryWidget("Kategoria 3"),
-          CategoryWidget("Kategoria 4"),
-        ],
-      ),
+      body: StreamBuilder<QuerySnapshot>(
+          stream:
+              FirebaseFirestore.instance.collection('categories').snapshots(),
+          builder: (context, snapshot) {
+            if (snapshot.hasError) {
+              return const Text('Wystąpił nieoczekiwany problem');
+            }
+
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Text('Proszę czekać, trwa ładowanie danych');
+            }
+
+            final documents = snapshot.data!.docs;
+
+            return ListView(
+              children: [
+                for (final document in documents) ...[
+                  Dismissible(
+                    key: ValueKey(document.id),
+                    onDismissed: (_) {
+                      FirebaseFirestore.instance
+                          .collection('categories')
+                          .doc(document.id)
+                          .delete();
+                    },
+                    child: CategoryWidget(
+                      document['title'],
+                    ),
+                  ),
+                ],
+                TextField(
+                  controller: controller,
+                ),
+              ],
+            );
+          }),
     );
   }
 }
